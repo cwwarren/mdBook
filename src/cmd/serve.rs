@@ -7,6 +7,7 @@ use iron::{status, AfterMiddleware, Chain, Iron, IronError, IronResult, Request,
 use mdbook::errors::*;
 use mdbook::utils;
 use mdbook::MDBook;
+use std::borrow::Cow;
 
 struct ErrorRecover;
 
@@ -44,12 +45,12 @@ pub fn make_subcommand<'a, 'b>() -> App<'a, 'b> {
                 .help("Port to use for HTTP connections"),
         )
         .arg(
-            Arg::with_name("websocket-hostname")
-                .long("websocket-hostname")
+            Arg::with_name("websocket-public-url")
+                .long("websocket-public-url")
                 .takes_value(true)
                 .empty_values(false)
                 .help(
-                    "Hostname to connect to for WebSockets connections (Defaults to the HTTP hostname)",
+                    "URL to connect to for WebSockets connections (Defaults to ws://$hostname:$websocket-port)",
                 ),
         )
         .arg(
@@ -72,13 +73,15 @@ pub fn execute(args: &ArgMatches) -> Result<()> {
     let port = args.value_of("port").unwrap();
     let ws_port = args.value_of("websocket-port").unwrap();
     let hostname = args.value_of("hostname").unwrap();
-    let public_address = args.value_of("websocket-hostname").unwrap_or(hostname);
+    let websocket_public_url = args.value_of("websocket-public-url")
+        .map(|uri| Cow::from(uri))
+        .unwrap_or_else(|| Cow::from(format!("ws://{}:{}", hostname, ws_port)));
     let open_browser = args.is_present("open");
 
     let address = format!("{}:{}", hostname, port);
     let ws_address = format!("{}:{}", hostname, ws_port);
 
-    let livereload_url = format!("ws://{}:{}", public_address, ws_port);
+    let livereload_url = websocket_public_url;
     book.config
         .set("output.html.livereload-url", &livereload_url)?;
 
